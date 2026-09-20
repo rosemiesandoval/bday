@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alfa Zoie's Photobooth</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #241733; --bg-2: #2F1F45; --card: #3A2857; --card-2: #46315F;
+    --gold: #FFC94D; --pink: #FF5C8A; --teal: #4FD8C4; --lilac: #C6A9F5;
+    --text: #F6F1FB; --text-dim: #C9BADC;
+    --font-display: 'Baloo 2', system-ui, sans-serif;
+    --font-body: 'Nunito', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background: radial-gradient(1200px 800px at 50% -10%, var(--bg-2), var(--bg) 60%);
+    color:var(--text); font-family:var(--font-body);
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; overflow:hidden;
+  }
+  .booth{
+    width:100%; max-width:520px; background:var(--card); border-radius:28px;
+    padding:26px 22px 24px; box-shadow:0 24px 60px rgba(0,0,0,0.4); text-align:center;
+    position:relative;
+  }
+  h1{ font-family:var(--font-display); font-weight:800; font-size:24px; margin:0 0 2px; }
+  .sub{ color:var(--text-dim); font-size:14px; margin:0 0 18px; }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .big-btn{
+    font-family:var(--font-display); font-weight:700; font-size:19px; color:#2A1B3D;
+    background:linear-gradient(180deg,#FFD873,var(--gold)); border:none; border-radius:999px;
+    padding:16px 34px; cursor:pointer; box-shadow:0 8px 0 #C9922A, 0 14px 24px rgba(0,0,0,0.3);
+  }
+  .big-btn:active{ transform:translateY(5px); box-shadow:0 3px 0 #C9922A; }
+  .ghost-btn{
+    background:transparent; border:1px solid rgba(255,255,255,0.2); color:var(--text-dim);
+    border-radius:999px; padding:12px 24px; font-weight:700; cursor:pointer; font-size:14px; font-family:var(--font-body);
+  }
+  .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+
+  #startIcon{ font-size:70px; margin-bottom:6px; }
+
+  video, canvas{ width:100%; border-radius:20px; background:#000; }
+  .video-wrap{ position:relative; margin-bottom:14px; }
+  #countdownOverlay{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-size:110px; font-weight:800; color:var(--gold);
+    text-shadow:0 4px 20px rgba(0,0,0,0.6); pointer-events:none;
+  }
+
+  #previewCanvas{ display:block; }
+
+  .name-field{
+    width:100%; margin:10px 0; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.1);
+    background:var(--card-2); color:var(--text); font-family:var(--font-body); font-size:15px;
+  }
+
+  .settings-gear{
+    position:absolute; top:16px; right:16px; background:none; border:none; color:var(--text-dim);
+    font-size:20px; cursor:pointer;
+  }
+
+  #qrBox{ background:#fff; padding:16px; border-radius:16px; display:inline-block; margin:10px 0; }
+  .album-input{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.1);
+    background:var(--card-2); color:var(--text); font-family:var(--font-body); font-size:14px; margin-bottom:10px;
+  }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--gold); color:#2A1B3D; font-weight:700; padding:12px 22px; border-radius:999px;
+    font-size:14px; box-shadow:0 10px 24px rgba(0,0,0,0.3); opacity:0; transition:opacity 0.3s;
+  }
+  .toast.show{ opacity:1; }
+  .note{ font-size:13px; color:var(--text-dim); margin-top:10px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div class="booth">
+  <button class="settings-gear" id="gearBtn" title="Album QR / Settings">⚙️</button>
+
+  <!-- START SCREEN -->
+  <div class="screen active" id="screen-start">
+    <div id="startIcon">🎉</div>
+    <h1>Alfa Zoie's 9th Birthday</h1>
+    <p class="sub">Tap below, strike a pose, and save your photo!</p>
+    <button class="big-btn" id="startBtn">📸 Take My Photo</button>
+    <div class="row">
+      <button class="ghost-btn" id="showAlbumBtn">View Album QR</button>
+    </div>
+  </div>
+
+  <!-- CAMERA SCREEN -->
+  <div class="screen" id="screen-camera">
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="countdownOverlay"></div>
+    </div>
+    <div class="row">
+      <button class="big-btn" id="captureBtn">Smile! 📸</button>
+      <button class="ghost-btn" id="flipBtn">Flip Camera</button>
+      <button class="ghost-btn" id="cancelCameraBtn">Cancel</button>
+    </div>
+    <p class="note" id="cameraError"></p>
+  </div>
+
+  <!-- PREVIEW SCREEN -->
+  <div class="screen" id="screen-preview">
+    <canvas id="previewCanvas"></canvas>
+    <input type="text" class="name-field" id="guestName" placeholder="Your name (optional, for the filename)">
+    <div class="row">
+      <button class="big-btn" id="saveBtn">💾 Save My Photo</button>
+    </div>
+    <div class="row">
+      <button class="ghost-btn" id="retakeBtn">Retake</button>
+      <button class="ghost-btn" id="doneBtn">Done</button>
+    </div>
+  </div>
+
+  <!-- ALBUM / QR SCREEN -->
+  <div class="screen" id="screen-album">
+    <h1 style="font-size:20px;">📷 Get all your photos</h1>
+    <p class="sub">Scan this to open the shared album</p>
+    <div id="qrBox"></div>
+    <p class="note" id="noAlbumNote">No album link set yet — tap "Edit link" below to add one.</p>
+    <div class="row">
+      <button class="ghost-btn" id="editLinkBtn">Edit link</button>
+      <button class="ghost-btn" id="backFromAlbumBtn">Back</button>
+    </div>
+    <div id="linkEditor" style="display:none; margin-top:14px; text-align:left;">
+      <input type="text" class="album-input" id="albumLinkInput" placeholder="Paste your Google Photos shared album link here">
+      <div class="row">
+        <button class="big-btn" id="saveLinkBtn" style="font-size:15px; padding:10px 22px;">Save Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const screens = {};
+  document.querySelectorAll('.screen').forEach(s => screens[s.id] = s);
+  function show(id){
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[id].classList.add('active');
+  }
+
+  const video = document.getElementById('video');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const countdownOverlay = document.getElementById('countdownOverlay');
+  const cameraError = document.getElementById('cameraError');
+  let stream = null;
+  let facingMode = 'user';
+  let currentPhotoDataUrl = null;
+
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=> t.classList.remove('show'), 2200);
+  }
+
+  async function startCamera(){
+    cameraError.textContent = '';
+    try{
+      if(stream) stream.getTracks().forEach(t=>t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio:false });
+      video.srcObject = stream;
+    }catch(err){
+      cameraError.textContent = "Couldn't access the camera. Please allow camera permission, and make sure no other app is using it.";
+    }
+  }
+
+  function stopCamera(){
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+  }
+
+  document.getElementById('startBtn').addEventListener('click', async ()=>{
+    show('screen-camera');
+    await startCamera();
+  });
+
+  document.getElementById('cancelCameraBtn').addEventListener('click', ()=>{
+    stopCamera();
+    show('screen-start');
+  });
+
+  document.getElementById('flipBtn').addEventListener('click', async ()=>{
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    await startCamera();
+  });
+
+  document.getElementById('captureBtn').addEventListener('click', ()=>{
+    let count = 3;
+    countdownOverlay.textContent = count;
+    const timer = setInterval(()=>{
+      count--;
+      if(count > 0){
+        countdownOverlay.textContent = count;
+      } else {
+        countdownOverlay.textContent = '📸';
+        clearInterval(timer);
+        setTimeout(()=>{
+          countdownOverlay.textContent = '';
+          takePhoto();
+        }, 350);
+      }
+    }, 800);
+  });
+
+  function takePhoto(){
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const size = Math.min(vw, vh);
+    const sx = (vw - size)/2, sy = (vh - size)/2;
+
+    const canvas = previewCanvas;
+    canvas.width = 900; canvas.height = 900;
+    const ctx = canvas.getContext('2d');
+
+    // mirror if front camera
+    if(facingMode === 'user'){
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1,0,0,1,0,0);
+
+    // decorative frame
+    const border = 28;
+    ctx.strokeStyle = '#FFC94D';
+    ctx.lineWidth = border;
+    ctx.strokeRect(border/2, border/2, canvas.width-border, canvas.height-border);
+
+    ctx.fillStyle = 'rgba(36,23,51,0.88)';
+    ctx.fillRect(0, canvas.height-90, canvas.width, 90);
+    ctx.fillStyle = '#FFC94D';
+    ctx.font = '700 30px Baloo 2, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText("Alfa Zoie's 9th Birthday 🎉", canvas.width/2, canvas.height-38);
+    ctx.fillStyle = '#F6F1FB';
+    ctx.font = '600 18px Nunito, sans-serif';
+    ctx.fillText('September 26, 2026', canvas.width/2, canvas.height-14);
+
+    // corner stars
+    ctx.font = '32px sans-serif';
+    ctx.fillText('⭐', 46, 56);
+    ctx.fillText('⭐', canvas.width-46, 56);
+
+    currentPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    stopCamera();
+    show('screen-preview');
+  }
+
+  document.getElementById('retakeBtn').addEventListener('click', async ()=>{
+    show('screen-camera');
+    await startCamera();
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', ()=>{
+    if(!currentPhotoDataUrl) return;
+    const name = document.getElementById('guestName').value.trim();
+    const safeName = name ? name.replace(/[^a-z0-9]/gi,'_') : 'guest';
+    const filename = `AlfaZoie_Birthday_${safeName}_${Date.now()}.jpg`;
+
+    const link = document.createElement('a');
+    link.href = currentPhotoDataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('Photo saved! 🎉');
+  });
+
+  document.getElementById('doneBtn').addEventListener('click', ()=>{
+    document.getElementById('guestName').value = '';
+    currentPhotoDataUrl = null;
+    show('screen-start');
+  });
+
+  // Album / QR logic
+  const ALBUM_KEY = 'photobooth_album_link';
+  document.getElementById('gearBtn').addEventListener('click', ()=> openAlbumScreen());
+  document.getElementById('showAlbumBtn').addEventListener('click', ()=> openAlbumScreen());
+  document.getElementById('backFromAlbumBtn').addEventListener('click', ()=> show('screen-start'));
+
+  function openAlbumScreen(){
+    show('screen-album');
+    renderQr();
+  }
+
+  function renderQr(){
+    const link = localStorage.getItem(ALBUM_KEY);
+    const qrBox = document.getElementById('qrBox');
+    const note = document.getElementById('noAlbumNote');
+    qrBox.innerHTML = '';
+    if(link){
+      note.style.display = 'none';
+      new QRCode(qrBox, { text: link, width: 220, height: 220 });
+    } else {
+      note.style.display = 'block';
+      qrBox.style.display = 'none';
+      setTimeout(()=>{ qrBox.style.display = 'inline-block'; }, 0);
+    }
+  }
+
+  document.getElementById('editLinkBtn').addEventListener('click', ()=>{
+    const editor = document.getElementById('linkEditor');
+    editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+    const existing = localStorage.getItem(ALBUM_KEY) || '';
+    document.getElementById('albumLinkInput').value = existing;
+  });
+
+  document.getElementById('saveLinkBtn').addEventListener('click', ()=>{
+    const val = document.getElementById('albumLinkInput').value.trim();
+    if(val){
+      localStorage.setItem(ALBUM_KEY, val);
+      document.getElementById('linkEditor').style.display = 'none';
+      renderQr();
+      toast('Album link saved!');
+    }
+  });
+})();
+</script>
+</body>
+</html>
